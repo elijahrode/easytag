@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # attach the app to releases on version tags
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --locked -- --test-threads=1
+
+      - name: Build app
+        run: ./scripts/bundle.sh
+
+      - name: Zip app
+        run: ditto -c -k --keepParent dist/easytag.app easytag-macos.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: easytag-macos
+          path: easytag-macos.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: easytag-macos.zip
